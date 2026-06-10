@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AlemOS Mobile</title>
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+}
+
+body{
+    height:100vh;
+    background:#000;
+    color:white;
+    overflow:hidden;
+    transition:background 0.3s,color 0.3s;
+}
+
+body.light{
+    background:#f2f2f7;
+    color:#000;
+}
+
+/* LOCK SCREEN */
+#lock{
+    position:absolute;
+    inset:0;
+    background:linear-gradient(180deg,#000428,#004e92);
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    z-index:10;
+    transition:transform 0.6s ease;
+}
+
+#lock.hidden{
+    transform:translateY(-100%);
+}
+
+#lock-time{
+    font-size:64px;
+    font-weight:200;
+}
+
+/* STATUS BAR */
+#status{
+    height:30px;
+    padding:0 12px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-size:14px;
+    background:rgba(0,0,0,0.4);
+}
+
+/* HOME */
+#home{
+    height:calc(100vh - 100px);
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:20px;
+    padding:20px;
+}
+
+.app{
+    text-align:center;
+    font-size:12px;
+    cursor:pointer;
+}
+
+.icon{
+    width:60px;
+    height:60px;
+    border-radius:15px;
+    background:rgba(255,255,255,0.2);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    font-size:28px;
+    margin:0 auto 5px;
+}
+
+/* DOCK */
+#dock{
+    height:70px;
+    margin:10px;
+    border-radius:25px;
+    background:rgba(255,255,255,0.15);
+    display:flex;
+    justify-content:space-around;
+    align-items:center;
+}
+
+/* APP SCREEN */
+.app-screen{
+    position:absolute;
+    inset:0;
+    background:inherit;
+    display:none;
+    flex-direction:column;
+}
+
+.app-screen.active{
+    display:flex;
+}
+
+.app-header{
+    height:50px;
+    display:flex;
+    align-items:center;
+    padding:0 15px;
+    background:rgba(0,0,0,0.2);
+}
+
+.back{
+    margin-right:10px;
+    cursor:pointer;
+}
+
+/* SETTINGS */
+.setting{
+    padding:15px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    border-bottom:1px solid rgba(255,255,255,0.1);
+}
+
+/* CONTROL CENTER */
+#control{
+    position:absolute;
+    top:-100%;
+    left:0;
+    width:100%;
+    height:60%;
+    background:rgba(40,40,40,0.6);
+    backdrop-filter:blur(30px);
+    border-radius:0 0 25px 25px;
+    padding:20px;
+    transition:top 0.4s ease;
+    z-index:20;
+}
+
+#control.active{
+    top:0;
+}
+
+.controls{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:15px;
+}
+
+.toggle{
+    background:rgba(255,255,255,0.15);
+    border-radius:15px;
+    height:70px;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    font-size:22px;
+    cursor:pointer;
+}
+
+.toggle.active{
+    background:#0a84ff;
+}
+
+#overlay{
+    position:absolute;
+    inset:0;
+    background:rgba(0,0,0,0.3);
+    display:none;
+    z-index:15;
+}
+#overlay.show{
+    display:block;
+}
+</style>
+</head>
+
+<body>
+
+<!-- LOCK -->
+<div id="lock" onclick="unlock()">
+    <div id="lock-time">00:00</div>
+    <div>toca para desbloquear</div>
+</div>
+
+<!-- CONTROL CENTER -->
+<div id="control">
+    <div class="controls">
+        <div class="toggle" onclick="toggle(this)">📶</div>
+        <div class="toggle" onclick="toggle(this)">✈️</div>
+        <div class="toggle" onclick="toggleDark()">🌙</div>
+        <div class="toggle">🔊</div>
+    </div>
+</div>
+
+<div id="overlay" onclick="closeControl()"></div>
+
+<!-- STATUS -->
+<div id="status">
+    <div id="time">00:00</div>
+    <div>📶 🔋</div>
+</div>
+
+<!-- HOME -->
+<div id="home">
+    <div class="app" onclick="openApp('settings')">
+        <div class="icon">⚙️</div>Ajustes
+    </div>
+    <div class="app">
+        <div class="icon">📁</div>Archivos
+    </div>
+    <div class="app">
+        <div class="icon">🖥️</div>Terminal
+    </div>
+</div>
+
+<!-- DOCK -->
+<div id="dock">
+    <div class="icon" onclick="openApp('settings')">⚙️</div>
+    <div class="icon">🌐</div>
+</div>
+
+<!-- SETTINGS APP -->
+<div id="settings" class="app-screen">
+    <div class="app-header">
+        <div class="back" onclick="closeApps()">⬅</div>
+        Ajustes
+    </div>
+
+    <div class="setting">
+        <span>Modo oscuro</span>
+        <input type="checkbox" id="darkToggle">
+    </div>
+
+    <div class="setting">
+        <span>Sonido del sistema</span>
+        <input type="checkbox" checked>
+    </div>
+</div>
+
+<script>
+/* TIME */
+function updateTime(){
+    const n=new Date();
+    const h=n.getHours().toString().padStart(2,'0');
+    const m=n.getMinutes().toString().padStart(2,'0');
+    time.textContent=lockTime.textContent=`${h}:${m}`;
+}
+const time=document.getElementById("time");
+const lockTime=document.getElementById("lock-time");
+setInterval(updateTime,1000);
+updateTime();
+
+/* LOCK */
+function unlock(){
+    document.getElementById("lock").classList.add("hidden");
+}
+
+/* APPS */
+function openApp(id){
+    document.querySelectorAll(".app-screen").forEach(a=>a.classList.remove("active"));
+    document.getElementById(id).classList.add("active");
+}
+
+function closeApps(){
+    document.querySelectorAll(".app-screen").forEach(a=>a.classList.remove("active"));
+}
+
+/* CONTROL CENTER */
+let startY=0;
+document.addEventListener("touchstart",e=>{
+    if(e.touches[0].clientY<40) startY=e.touches[0].clientY;
+});
+document.addEventListener("touchend",e=>{
+    if(e.changedTouches[0].clientY-startY>80) openControl();
+});
+
+function openControl(){
+    control.classList.add("active");
+    overlay.classList.add("show");
+}
+function closeControl(){
+    control.classList.remove("active");
+    overlay.classList.remove("show");
+}
+function toggle(el){
+    el.classList.toggle("active");
+}
+
+/* DARK MODE */
+const darkToggle=document.getElementById("darkToggle");
+function toggleDark(){
+    darkToggle.checked=!darkToggle.checked;
+    applyDark();
+}
+function applyDark(){
+    document.body.classList.toggle("light",!darkToggle.checked);
+    localStorage.setItem("dark",darkToggle.checked);
+}
+if(localStorage.getItem("dark")==="true"){
+    darkToggle.checked=true;
+    applyDark();
+}else{
+    document.body.classList.add("light");
+}
+</script>
+
+</body>
+</html>
